@@ -1,5 +1,6 @@
 
 import haiku as hk
+import jax
 
 from .model import WaveRNN
 
@@ -22,7 +23,6 @@ if __name__ == '__main__':
     from argparse import ArgumentParser
     from pathlib import Path
 
-    import jax
     import numpy as np
     import soundfile as sf
 
