@@ -130,7 +130,7 @@ class WaveRNNOriginal(hk.Module):
         h0 = self.initial_state(N)
         (ct, ft), _ = hk.dynamic_unroll(
             loop, (mels, rng1s, rng2s), (c0, f0, h0), time_major=False)
-        return ct*1024 + ft - 2**15
+        return ct*64 + ft - 2**15
 
     def __call__(self, x, mel):
         coarse, fine, coarse_t = jax.tree_map(

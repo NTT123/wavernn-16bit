@@ -100,12 +100,16 @@ def load_latest_ckpt(ckpt_dir):
 def train(args):
     rng = jax.random.PRNGKey(42)
     dataset = load_data_on_memory(args.wav_dir)
-    test_mel = dataset[0][0].T[:800]
-    test_y = dataset[0][1][:22050*10]
-    # import pdb; pdb.set_trace()
     # keep the first 100 clips for evaluation
-    data_iter = create_data_iter(
-        dataset, FLAGS.n_frames, FLAGS.batch_size)
+    if len(dataset) > 100:
+        test_mel = dataset[0][0].T
+        test_y = dataset[0][1]
+        dataset = dataset[100:]
+    else:
+        test_mel = dataset[0][0].T[:800]
+        test_y = dataset[0][1][:22050*10]
+        dataset = dataset
+    data_iter = create_data_iter(dataset, FLAGS.n_frames, FLAGS.batch_size)
     params, aux = loss_fn.init(rng, next(data_iter))
     optim_state = optimizer.init(params)
 
