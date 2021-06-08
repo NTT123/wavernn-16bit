@@ -1,4 +1,3 @@
-
 class FLAGS:
     batch_size = 128
     training_steps = 1_000_000
@@ -17,3 +16,5 @@ class FLAGS:
     fmax = 8000
     n_frames = 12  # per sequence
     pad = 1024
+    num_coarse_bits = 10  #
+    num_fine_bits = 6     # must sum to 16

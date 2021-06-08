@@ -1,4 +1,3 @@
-import gc
 import random
 from pathlib import Path
 
@@ -40,15 +39,14 @@ def load_data_on_memory(wav_dir: Path):
 
 def create_data_iter(dataset, seq_len, batch_size):
     batch = []
-    rng = random.Random(42)
 
     while True:
-        rng.shuffle(dataset)
+        random.shuffle(dataset)
         for mel, y in dataset:
-            R = rng.randint(seq_len, mel.shape[1]-1)
+            R = random.randint(seq_len, mel.shape[1]-1)
             L = R - seq_len
             m1 = mel[:, L: R]
-            y1 = y[(L*256):(R*256)]
+            y1 = y[(L*FLAGS.hop_length):(R*FLAGS.hop_length)]
             batch.append((m1, y1))
             if len(batch) == batch_size:
                 m2, y2 = zip(*batch)

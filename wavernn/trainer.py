@@ -17,18 +17,15 @@ from .model import WaveRNN
 
 
 @hk.transform_with_state
-def inference_(mel):
+def inference(mel):
     net = WaveRNN()
     return net.inference(mel)
-
-
-def inference(a, b, c, d): return inference_.apply(a, b, c, d)[0]
 
 
 def test_inference(params, aux, mel, y):
     mel = mel[None]
     rng = jax.random.PRNGKey(42)
-    wav = inference(params, aux, rng, mel)
+    wav = inference.apply(params, aux, rng, mel)[0]
     return wav[0]
 
 
@@ -37,8 +34,11 @@ def test_inference(params, aux, mel, y):
 def loss_fn(inputs):
     mel, signal = inputs
     signal = signal.astype(jnp.int32) + 2**15
-    high = jnp.bitwise_and(jnp.right_shift(signal, 6), int('0b1111111111', 2))
-    low = jnp.bitwise_and(signal, int('0b111111', 2))
+    high = jnp.bitwise_and(
+        jnp.right_shift(signal, FLAGS.num_fine_bits),
+        int('0b' + '1' * FLAGS.num_coarse_bits, 2)
+    )
+    low = jnp.bitwise_and(signal, int('0b' + '1' * FLAGS.num_fine_bits, 2))
     high1 = jnp.roll(high, -1, -1)
     x = jnp.stack((high, low, high1), axis=-1)
     pad = FLAGS.pad
@@ -46,8 +46,10 @@ def loss_fn(inputs):
     xinput = x[:, :-1]
     xtarget = x[:, 1:, :-1]
     cllh, fllh = WaveRNN()(xinput, mel)
-    clogprs = jax.nn.one_hot(xtarget[..., 0], num_classes=1024, axis=-1) * cllh
-    flogprs = jax.nn.one_hot(xtarget[..., 1], num_classes=64, axis=-1) * fllh
+    clogprs = jax.nn.one_hot(
+        xtarget[..., 0], num_classes=2**FLAGS.num_coarse_bits, axis=-1) * cllh
+    flogprs = jax.nn.one_hot(
+        xtarget[..., 1], num_classes=2**FLAGS.num_fine_bits, axis=-1) * fllh
     closs = -jnp.sum(clogprs, axis=-1)
     floss = -jnp.sum(flogprs, axis=-1)
     loss = jnp.mean(closs + floss)
@@ -64,7 +66,7 @@ optimizer = optax.chain(
     optax.clip_by_global_norm(1),
     optax.adam(
         optax.exponential_decay(FLAGS.learning_rate,
-                                100_000, 0.5, 0, True, 1e-6)
+                                100_000, 0.5, False, 1e-6)
     )
 )
 

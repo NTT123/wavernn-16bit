@@ -74,11 +74,11 @@ class WaveRNNOriginal(hk.Module):
         mask = mask.at[-embed_dim:, 8*d:11*d].set(0.0)
         self.I_W_mask = mask
         self.O1 = hk.Linear(hidden_dim//4*3)
-        self.O2 = hk.Linear(1024)
+        self.O2 = hk.Linear(2**FLAGS.num_coarse_bits)
         self.O3 = hk.Linear(hidden_dim//4)
-        self.O4 = hk.Linear(64)
-        self.c_embed = hk.Embed(1024, embed_dim)
-        self.f_embed = hk.Embed(64, embed_dim)
+        self.O4 = hk.Linear(2**FLAGS.num_fine_bits)
+        self.c_embed = hk.Embed(2**FLAGS.num_coarse_bits, embed_dim)
+        self.f_embed = hk.Embed(2**FLAGS.num_fine_bits, embed_dim)
 
     def initial_state(self, batch_size: int):
         return jnp.zeros((batch_size, self.hidden_dim))
@@ -105,8 +105,8 @@ class WaveRNNOriginal(hk.Module):
     def inference(self, mels):
         N, L, D = mels.shape
 
-        c0 = jnp.array([512]).astype(jnp.int32)
-        f0 = jnp.array([32]).astype(jnp.int32)
+        c0 = jnp.array([(2**FLAGS.num_coarse_bits) // 2]).astype(jnp.int32)
+        f0 = jnp.array([(2**FLAGS.num_fine_bits)//2]).astype(jnp.int32)
 
         def loop(inputs, prev_state):
             mel, rng1, rng2 = inputs
@@ -130,7 +130,7 @@ class WaveRNNOriginal(hk.Module):
         h0 = self.initial_state(N)
         (ct, ft), _ = hk.dynamic_unroll(
             loop, (mels, rng1s, rng2s), (c0, f0, h0), time_major=False)
-        return ct*64 + ft - 2**15
+        return ct*(2**FLAGS.num_fine_bits) + ft - 2**15
 
     def __call__(self, x, mel):
         coarse, fine, coarse_t = jax.tree_map(
