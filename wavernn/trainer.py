@@ -13,20 +13,8 @@ import soundfile as sf
 
 from .config import FLAGS
 from .dataloader import create_data_iter, load_data_on_memory
+from .mel2wave import mel2wave
 from .model import WaveRNN
-
-
-@hk.transform_with_state
-def inference(mel):
-    net = WaveRNN()
-    return net.inference(mel)
-
-
-def test_inference(params, aux, mel, y):
-    mel = mel[None]
-    rng = jax.random.PRNGKey(42)
-    wav = inference.apply(params, aux, rng, mel)[0]
-    return wav[0]
 
 
 @hk.without_apply_rng
@@ -150,7 +138,7 @@ def train(args):
         if step % 1000 == 0:
             save_ckpt(args.ckpt_dir, step, params, aux, optim_state)
             last_step = step
-            w = test_inference(params, aux, test_mel, test_y)
+            w = mel2wave(params, aux, rng, test_mel)
             w = jax.device_get(w.astype(jnp.int16))
             sf.write(str(
                 args.ckpt_dir / f'test_clip_{step}.wav'), data=w, samplerate=FLAGS.sample_rate)
