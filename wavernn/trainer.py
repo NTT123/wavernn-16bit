@@ -37,19 +37,21 @@ def test_inference(params, aux, mel, y):
 def loss_fn(inputs):
     mel, signal = inputs
     signal = signal.astype(jnp.int32) + 2**15
-    high = jnp.bitwise_and(jnp.right_shift(signal, 8), 0x00ff)
-    low = jnp.bitwise_and(signal, 0x00ff)
+    high = jnp.bitwise_and(jnp.right_shift(signal, 6), int('0b1111111111', 2))
+    low = jnp.bitwise_and(signal, int('0b111111', 2))
     high1 = jnp.roll(high, -1, -1)
     x = jnp.stack((high, low, high1), axis=-1)
     pad = FLAGS.pad
     x = x[:, (pad-1):-pad]
     xinput = x[:, :-1]
     xtarget = x[:, 1:, :-1]
-    logprs_hat = WaveRNN()(xinput, mel)
-    logprs = jax.nn.one_hot(xtarget, num_classes=256, axis=-2) * logprs_hat
-    loss = -jnp.sum(logprs, axis=[-2, -1])
-    loss = jnp.mean(loss)
-    return loss, logprs_hat[0], xtarget[0]
+    cllh, fllh = WaveRNN()(xinput, mel)
+    clogprs = jax.nn.one_hot(xtarget[..., 0], num_classes=1024, axis=-1) * cllh
+    flogprs = jax.nn.one_hot(xtarget[..., 1], num_classes=64, axis=-1) * fllh
+    closs = -jnp.sum(clogprs, axis=-1)
+    floss = -jnp.sum(flogprs, axis=-1)
+    loss = jnp.mean(closs + floss)
+    return loss, cllh[0], xtarget[0]
 
 
 def loss_(params, aux, inputs):
@@ -75,9 +77,9 @@ def update_fn(params, aux, optim_state, inputs):
     return (loss, logpr, target), (new_params, new_aux, new_optim_state)
 
 
-def save_ckpt(step, params, aux, optim_state):
+def save_ckpt(ckpt_dir, step, params, aux, optim_state):
     dic = {'step': step, 'params': params, 'aux': aux, 'optim': optim_state}
-    with open(FLAGS.ckpt_dir / f'ckpt_{step:08d}.pickle', 'wb') as f:
+    with open(ckpt_dir / f'ckpt_{step:08d}.pickle', 'wb') as f:
         pickle.dump(dic, f)
 
 
@@ -87,8 +89,8 @@ def load_ckpt(path):
     return dic
 
 
-def load_latest_ckpt():
-    files = sorted(FLAGS.ckpt_dir.glob('ckpt_*.pickle'))
+def load_latest_ckpt(ckpt_dir):
+    files = sorted(ckpt_dir.glob('ckpt_*.pickle'))
     if len(files) > 0:
         return load_ckpt(files[-1])
     else:
@@ -98,15 +100,16 @@ def load_latest_ckpt():
 def train(args):
     rng = jax.random.PRNGKey(42)
     dataset = load_data_on_memory(args.wav_dir)
-    test_mel = dataset[0][0].T
-    test_y = dataset[0][1]
+    test_mel = dataset[0][0].T[:800]
+    test_y = dataset[0][1][:22050*10]
+    # import pdb; pdb.set_trace()
     # keep the first 100 clips for evaluation
     data_iter = create_data_iter(
-        dataset[100:], FLAGS.n_frames, FLAGS.batch_size)
+        dataset, FLAGS.n_frames, FLAGS.batch_size)
     params, aux = loss_fn.init(rng, next(data_iter))
     optim_state = optimizer.init(params)
 
-    dic = load_latest_ckpt()
+    dic = load_latest_ckpt(args.ckpt_dir)
 
     if dic is not None:
         params = dic['params']
@@ -131,7 +134,7 @@ def train(args):
             start = end
             print(
                 f'step {step} train loss {loss:.5f}  {delta:.3f}s/[100 steps]')
-            pr = jax.device_get(jnp.exp(logpr[:, :, 0]))
+            pr = jax.device_get(jnp.exp(logpr))
             plt.figure(figsize=(20, 5))
             plt.imshow(pr.T, aspect='auto', cmap='hot')
             plt.plot(target[..., 0], c='yellow', lw=1)
@@ -139,10 +142,10 @@ def train(args):
             plt.close()
 
         if step % 1000 == 0:
-            save_ckpt(step, params, aux, optim_state)
+            save_ckpt(args.ckpt_dir, step, params, aux, optim_state)
             last_step = step
-            w = test_inference(test_mel, test_y)
-            w = jax.device_get(w)
+            w = test_inference(params, aux, test_mel, test_y)
+            w = jax.device_get(w.astype(jnp.int16))
             sf.write(str(
                 args.ckpt_dir / f'test_clip_{step}.wav'), data=w, samplerate=FLAGS.sample_rate)
 

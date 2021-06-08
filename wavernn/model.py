@@ -66,19 +66,19 @@ class WaveRNNOriginal(hk.Module):
             'I_W', (cond_dim + 128*3, hidden_dim*3), init=hk.initializers.VarianceScaling())
         self.I_b = hk.get_parameter('I_b', (1, 3*hidden_dim), init=jnp.zeros)
         assert hidden_dim % 2 == 0, "Need an even hidden dim"
-        d = hidden_dim // 2
+        d = hidden_dim // 4
         mask = jnp.ones_like(self.I_W)
         embed_dim = hidden_dim // 8
-        mask = mask.at[-embed_dim:, 0*d:1*d].set(0.0)
-        mask = mask.at[-embed_dim:, 2*d:3*d].set(0.0)
-        mask = mask.at[-embed_dim:, 4*d:5*d].set(0.0)
+        mask = mask.at[-embed_dim:, 0*d:3*d].set(0.0)
+        mask = mask.at[-embed_dim:, 4*d:7*d].set(0.0)
+        mask = mask.at[-embed_dim:, 8*d:11*d].set(0.0)
         self.I_W_mask = mask
-        self.O1 = hk.Linear(hidden_dim//2)
-        self.O2 = hk.Linear(256)
-        self.O3 = hk.Linear(hidden_dim//2)
-        self.O4 = hk.Linear(256)
-        self.c_embed = hk.Embed(256, embed_dim)
-        self.f_embed = hk.Embed(256, embed_dim)
+        self.O1 = hk.Linear(hidden_dim//4*3)
+        self.O2 = hk.Linear(1024)
+        self.O3 = hk.Linear(hidden_dim//4)
+        self.O4 = hk.Linear(64)
+        self.c_embed = hk.Embed(1024, embed_dim)
+        self.f_embed = hk.Embed(64, embed_dim)
 
     def initial_state(self, batch_size: int):
         return jnp.zeros((batch_size, self.hidden_dim))
@@ -99,14 +99,14 @@ class WaveRNNOriginal(hk.Module):
         rt = jax.nn.sigmoid(rt_1 + rt_2)
         et = jnp.tanh(rt * et_1 + et_2)
         ht = ut * hx + (1. - ut) * et
-        yc, yf = jnp.split(ht, 2, axis=-1)
+        yc, yf = jnp.split(ht, [self.hidden_dim//4*3], axis=-1)
         return (yc, yf), ht
 
     def inference(self, mels):
         N, L, D = mels.shape
 
-        c0 = jnp.array([127]).astype(jnp.int32)
-        f0 = jnp.array([0]).astype(jnp.int32)
+        c0 = jnp.array([512]).astype(jnp.int32)
+        f0 = jnp.array([32]).astype(jnp.int32)
 
         def loop(inputs, prev_state):
             mel, rng1, rng2 = inputs
@@ -130,7 +130,7 @@ class WaveRNNOriginal(hk.Module):
         h0 = self.initial_state(N)
         (ct, ft), _ = hk.dynamic_unroll(
             loop, (mels, rng1s, rng2s), (c0, f0, h0), time_major=False)
-        return ct*256 + ft - 2**15
+        return ct*1024 + ft - 2**15
 
     def __call__(self, x, mel):
         coarse, fine, coarse_t = jax.tree_map(
@@ -144,14 +144,11 @@ class WaveRNNOriginal(hk.Module):
         N, L, D = inputs.shape
         hx = self.initial_state(N)
         (yc, yf), _ = hk.dynamic_unroll(self.step, inputs, hx, time_major=False)
-        logits = jnp.stack(
-            (
-                self.O2(jax.nn.relu(self.O1(yc))),
-                self.O4(jax.nn.relu(self.O3(yf)))
-            ),
-            axis=-1
-        )
-        return jax.nn.log_softmax(logits, axis=-2)
+        clogits_ = self.O2(jax.nn.relu(self.O1(yc)))
+        flogits_ = self.O4(jax.nn.relu(self.O3(yf)))
+        clogits = jax.nn.log_softmax(clogits_, axis=-1)
+        flogits = jax.nn.log_softmax(flogits_, axis=-1)
+        return clogits, flogits
 
 
 class WaveRNN(hk.Module):
