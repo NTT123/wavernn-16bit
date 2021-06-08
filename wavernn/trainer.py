@@ -126,8 +126,12 @@ def train(args):
             end = time.perf_counter()
             delta = end-start
             start = end
-            print(
-                f'step {step} train loss {loss:.5f}  {delta:.3f}s/[100 steps]')
+            print(f'step {step} train loss {loss:.5f}  {delta:.3f}s')
+
+
+        if step % 1000 == 0:
+            save_ckpt(args.ckpt_dir, step, params, aux, optim_state)
+
             pr = jax.device_get(jnp.exp(logpr))
             plt.figure(figsize=(20, 5))
             plt.imshow(pr.T, aspect='auto', cmap='hot')
@@ -135,8 +139,6 @@ def train(args):
             plt.savefig(args.ckpt_dir / f'predicted_distribution_{step}.png')
             plt.close()
 
-        if step % 1000 == 0:
-            save_ckpt(args.ckpt_dir, step, params, aux, optim_state)
             last_step = step
             w = mel2wave(params, aux, rng, test_mel)
             w = jax.device_get(w.astype(jnp.int16))
