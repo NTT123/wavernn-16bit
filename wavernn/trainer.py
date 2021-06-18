@@ -20,7 +20,7 @@ from .model import WaveRNN
 def mol_llh(params, target, bits=16):
     mean_hat, scale_hat, weight_hat = jnp.split(params, 3, axis=-1)
     mean = jnp.tanh(mean_hat)
-    scale = jax.nn.softplus(scale_hat)
+    scale = jnp.exp(scale_hat)
     log_weight = jax.nn.log_softmax(weight_hat, axis=-1)
 
     x = target[..., None] - mean

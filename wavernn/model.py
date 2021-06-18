@@ -78,7 +78,7 @@ class WaveRNN(hk.Module):
             mol_params = self.mol_projection(x)
             mean_hat, scale_hat, weight_hat = jnp.split(mol_params, 3, axis=-1)
             mean = jnp.tanh(mean_hat)
-            scale = jax.nn.softplus(scale_hat)
+            scale = jnp.exp(scale_hat)
             idx = jax.random.categorical(rng1, weight_hat, axis=-1)
             mask = jax.nn.one_hot(idx, num_classes=self.num_mixtures)
             mean = jnp.sum(mean * mask, axis=-1)
