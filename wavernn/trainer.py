@@ -146,7 +146,7 @@ def train(args):
 
             last_step = step
             w = mel2wave(params, aux, rng, test_mel)
-            w = jax.device_get(w.astype(jnp.int16))
+            w = jax.device_get(w.astype(jnp.float32))
             sf.write(str(
                 args.ckpt_dir / f'test_clip_{step}.wav'), data=w, samplerate=FLAGS.sample_rate)
 
