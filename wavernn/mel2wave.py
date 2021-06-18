@@ -38,7 +38,7 @@ if __name__ == '__main__':
         dic = pickle.load(f)
     rng = jax.random.PRNGKey(args.random_seed)
     mel = np.load(args.mel_file)
-    wav = mel2wave(dic['params'], dic['aux'], rng, mel).astype(np.int16)
+    wav = mel2wave(dic['params'], dic['aux'], rng, mel).astype(np.float32)
     from .config import FLAGS
     sf.write(str(args.output_wav_file), data=wav, samplerate=FLAGS.sample_rate)
     print('Output file at', args.output_wav_file)
