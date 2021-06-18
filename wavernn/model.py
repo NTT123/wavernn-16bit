@@ -57,11 +57,11 @@ class WaveRNN(hk.Module):
     def __init__(self, num_mixtures: int = 10, is_training=True):
         super().__init__()
         self.rnn = hk.LSTM(FLAGS.rnn_dim)
-        self.mol_projection = hk.Sequential(
+        self.mol_projection = hk.Sequential([
             hk.Linear(FLAGS.rnn_dim),
             jax.nn.relu,
             hk.Linear(num_mixtures * 3)
-        )
+        ])
         self.upsample = UpsampleNetwork(
             num_output_channels=FLAGS.rnn_dim//2, is_training=is_training)
         self.is_training = is_training
