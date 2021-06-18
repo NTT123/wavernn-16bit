@@ -3,8 +3,6 @@ The (unofficial) vanilla version of WaveRNN. Read the WaveRNN paper at [here](ht
 
 **Note**:
 - We use the upsample network from [Lyra paper](https://arxiv.org/abs/2102.09660).
-- We use embed vectors for coarse and fine values instead of scalar real values as described in the paper. The reason is that I noticed some click artifacts in synthesised sound when using real values.
-- We use 10 coarse bits and 6 fine bits. My theory is that low coarse resolution causes click artifacts. Also, we use 3/4 of RNN cells for coarse bits prediction and 1/4 for fine bits prediction.
 
 To install:
 ```sh

@@ -20,7 +20,8 @@ def wav2mel(y):
         center=True,
         n_mels=FLAGS.n_mels,
         fmin=FLAGS.fmin,
-        fmax=FLAGS.fmax
+        fmax=FLAGS.fmax,
+        power=1
     )
     mel = np.log(mel + 1e-5)
     return mel
