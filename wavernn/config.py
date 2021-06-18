@@ -5,6 +5,7 @@ class FLAGS:
     learning_rate = 512e-6
 
     rnn_dim = 1024
+    num_mixtures = 10
 
     # data dsp
     sample_rate = 22050

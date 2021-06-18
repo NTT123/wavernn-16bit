@@ -3,11 +3,12 @@ import haiku as hk
 import jax
 
 from .model import WaveRNN
+from .config import FLAGS
 
 
 @hk.transform_with_state
 def inference(mel):
-    net = WaveRNN()
+    net = WaveRNN(num_mixtures=FLAGS.num_mixtures)
     return net.inference(mel)
 
 
