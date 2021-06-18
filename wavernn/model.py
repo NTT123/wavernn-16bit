@@ -69,7 +69,7 @@ class WaveRNN(hk.Module):
         def loop(inputs, prev_state):
             cond, rng1, rng2 = inputs
             xp, hx = prev_state
-            x = jnp.concatenate((cond, xp), axis=-1)
+            x = jnp.concatenate((cond, xp[..., None]), axis=-1)
             x, new_hx = self.rnn(x, hx)
             mol_params = self.mol_projection(x)
             mean_hat, scale_hat, weight_hat = jnp.split(mol_params, 3, axis=-1)
@@ -77,8 +77,8 @@ class WaveRNN(hk.Module):
             scale = jax.nn.softplus(scale_hat)
             idx = jax.random.categorical(rng1, weight_hat, axis=-1)
             mask = jax.nn.one_hot(idx, num_classes=self.num_mixtures)
-            mean = jnp.sum(mean * mask)
-            scale = jnp.sum(scale * mask)
+            mean = jnp.sum(mean * mask, axis=-1)
+            scale = jnp.sum(scale * mask, axis=-1)
             r = jax.random.logistic(rng2, mean.shape)
             x = (r / scale) + mean
             x = jnp.clip(x, a_min=-1., a_max=1.)
@@ -97,7 +97,7 @@ class WaveRNN(hk.Module):
         mel = self.upsample(mel)
         B, L, D = mel.shape
         hx = self.rnn.initial_state(B)
-        x = jnp.concatenate((mel, x), axis=-1)
+        x = jnp.concatenate((mel, x[..., None]), axis=-1)
         x, _ = hk.dynamic_unroll(self.rnn, x, hx, time_major=False)
         mol_params = self.mol_projection(x)
         return mol_params

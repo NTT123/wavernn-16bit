@@ -42,7 +42,7 @@ def loss_fn(inputs):
     pad = FLAGS.pad
     x = x[:, (pad-1):-pad]
     xinput = x[:, :-1]
-    xtarget = x[:, 1:, :-1]
+    xtarget = x[:, 1:]
     mol_params = WaveRNN(num_mixtures=FLAGS.num_mixtures)(xinput, mel)
     llh = mol_llh(mol_params, xtarget)
     loss = -jnp.mean(llh)
