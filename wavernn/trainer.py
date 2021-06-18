@@ -140,7 +140,7 @@ def train(args):
             pr = jax.device_get(jnp.exp(logpr))
             plt.figure(figsize=(20, 5))
             plt.imshow(pr, aspect='auto', cmap='hot')
-            plt.plot(target[..., 0], c='yellow', lw=1)
+            plt.plot((target + 1.0) / 2. * 255., c='yellow', lw=2)
             plt.savefig(args.ckpt_dir / f'predicted_distribution_{step}.png')
             plt.close()
 
