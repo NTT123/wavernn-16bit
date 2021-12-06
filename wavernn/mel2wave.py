@@ -2,12 +2,12 @@
 import haiku as hk
 import jax
 
-from .model import WaveRNN
+from wavernn.model import Vocoder
 
 
 @hk.transform_with_state
 def inference(mel):
-    net = WaveRNN()
+    net = Vocoder()
     return net.inference(mel)
 
 

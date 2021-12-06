@@ -18,5 +18,5 @@ python3 -m wavernn.trainer --wav-dir=path/to/wav/directory --ckpt-dir=path/to/ch
 
 To synthesize speech from melspectrogram:
 ```sh
-python3 -m wavernn.text2mel -m path/to/mel_file.npy -c path/to/training/checkpoint.pickle -o path/to/output.wav
+python3 -m wavernn.mel2wave -m path/to/mel_file.npy -c path/to/training/checkpoint.pickle -o path/to/output.wav
 ```

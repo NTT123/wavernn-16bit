@@ -53,8 +53,8 @@ class UpsampleNetwork(hk.Module):
         return x
 
 
-class WaveRNNOriginal(hk.Module):
-    """The orginal wavernn model."""
+class WaveRNN(hk.Module):
+    """The vanilla WaveRNN model."""
 
     def __init__(self, hidden_dim: int = 1024, cond_dim=0):
         super().__init__()
@@ -151,10 +151,10 @@ class WaveRNNOriginal(hk.Module):
         return clogits, flogits
 
 
-class WaveRNN(hk.Module):
+class Vocoder(hk.Module):
     def __init__(self, is_training=True):
         super().__init__()
-        self.rnn = WaveRNNOriginal(FLAGS.rnn_dim, FLAGS.rnn_dim//2)
+        self.rnn = WaveRNN(FLAGS.rnn_dim, FLAGS.rnn_dim//2)
         self.upsample = UpsampleNetwork(
             num_output_channels=FLAGS.rnn_dim//2, is_training=is_training)
         self.is_training = is_training
