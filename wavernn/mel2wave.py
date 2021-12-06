@@ -1,7 +1,13 @@
+import pickle
+from argparse import ArgumentParser
+from pathlib import Path
 
 import haiku as hk
 import jax
+import numpy as np
+import soundfile as sf
 
+from wavernn.config import FLAGS
 from wavernn.model import Vocoder
 
 
@@ -18,26 +24,18 @@ def mel2wave(params, aux, rng, mel):
     return jax.device_get(wav[0])
 
 
-if __name__ == '__main__':
-    import pickle
-    from argparse import ArgumentParser
-    from pathlib import Path
-
-    import numpy as np
-    import soundfile as sf
-
+if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument('-m', '--mel-file', type=Path, required=True)
-    parser.add_argument('-c', '--ckpt-file', type=Path, required=True)
-    parser.add_argument('-o', '--output-wav-file', type=Path, required=True)
-    parser.add_argument('-s', '--random-seed', type=int, default=42)
+    parser.add_argument("-m", "--mel-file", type=Path, required=True)
+    parser.add_argument("-c", "--ckpt-file", type=Path, required=True)
+    parser.add_argument("-o", "--output-wav-file", type=Path, required=True)
+    parser.add_argument("-s", "--random-seed", type=int, default=42)
     args = parser.parse_args()
 
-    with open(args.ckpt_file, 'rb') as f:
+    with open(args.ckpt_file, "rb") as f:
         dic = pickle.load(f)
     rng = jax.random.PRNGKey(args.random_seed)
     mel = np.load(args.mel_file)
-    wav = mel2wave(dic['params'], dic['aux'], rng, mel).astype(np.int16)
-    from .config import FLAGS
+    wav = mel2wave(dic["params"], dic["aux"], rng, mel).astype(np.int16)
     sf.write(str(args.output_wav_file), data=wav, samplerate=FLAGS.sample_rate)
-    print('Output file at', args.output_wav_file)
+    print("Output file at", args.output_wav_file)

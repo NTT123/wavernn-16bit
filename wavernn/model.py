@@ -2,48 +2,59 @@ import haiku as hk
 import jax
 import jax.numpy as jnp
 
-from .config import FLAGS
+from wavernn.config import FLAGS
 
 
 class UpsampleNetwork(hk.Module):
     def __init__(self, num_output_channels, is_training=True):
         super().__init__()
-        self.input_conv = hk.Conv1D(512, 3, padding='VALID', with_bias=False)
+        self.input_conv = hk.Conv1D(512, 3, padding="VALID", with_bias=False)
         self.input_bn = hk.BatchNorm(True, True, 0.99)
         self.dilated_conv_1 = hk.Conv1D(
-            512, 2, 1, rate=2, padding='VALID', with_bias=False)
+            512, 2, 1, rate=2, padding="VALID", with_bias=False
+        )
         self.dilated_bn_1 = hk.BatchNorm(True, True, 0.99)
         self.dilated_conv_2 = hk.Conv1D(
-            512, 2, 1, rate=4, padding='VALID', with_bias=False)
+            512, 2, 1, rate=4, padding="VALID", with_bias=False
+        )
         self.dilated_bn_2 = hk.BatchNorm(True, True, 0.99)
 
         self.upsample_conv_1 = hk.Conv1DTranspose(
-            512, kernel_shape=1, stride=2, padding='SAME', with_bias=False)
+            512, kernel_shape=1, stride=2, padding="SAME", with_bias=False
+        )
         self.upsample_bn_1 = hk.BatchNorm(True, True, 0.99)
         self.upsample_conv_2 = hk.Conv1DTranspose(
-            512, kernel_shape=1, stride=2, padding='SAME', with_bias=False)
+            512, kernel_shape=1, stride=2, padding="SAME", with_bias=False
+        )
         self.upsample_bn_2 = hk.BatchNorm(True, True, 0.99)
         self.upsample_conv_3 = hk.Conv1DTranspose(
-            num_output_channels, kernel_shape=1, stride=4, padding='SAME', with_bias=False)
+            num_output_channels,
+            kernel_shape=1,
+            stride=4,
+            padding="SAME",
+            with_bias=False,
+        )
         self.upsample_bn_3 = hk.BatchNorm(True, True, 0.99)
         self.is_training = is_training
 
     def __call__(self, mel):
-        x = jax.nn.relu(self.input_bn(self.input_conv(mel),
-                                      is_training=self.is_training))
-        res_1 = jax.nn.relu(self.dilated_bn_1(
-            self.dilated_conv_1(x), is_training=self.is_training))
+        x = self.input_bn(self.input_conv(mel), is_training=self.is_training)
+        x = jax.nn.relu(x)
+        res_1 = jax.nn.relu(
+            self.dilated_bn_1(self.dilated_conv_1(x), is_training=self.is_training)
+        )
         x = x[:, 1:-1] + res_1
-        res_2 = jax.nn.relu(self.dilated_bn_2(
-            self.dilated_conv_2(x), is_training=self.is_training))
+        res_2 = jax.nn.relu(
+            self.dilated_bn_2(self.dilated_conv_2(x), is_training=self.is_training)
+        )
         x = x[:, 2:-2] + res_2
 
-        x = jax.nn.relu(self.upsample_bn_1(
-            self.upsample_conv_1(x), is_training=self.is_training))
-        x = jax.nn.relu(self.upsample_bn_2(
-            self.upsample_conv_2(x), is_training=self.is_training))
-        x = jax.nn.relu(self.upsample_bn_3(
-            self.upsample_conv_3(x), is_training=self.is_training))
+        x = self.upsample_bn_1(self.upsample_conv_1(x), is_training=self.is_training)
+        x = jax.nn.relu(x)
+        x = self.upsample_bn_2(self.upsample_conv_2(x), is_training=self.is_training)
+        x = jax.nn.relu(x)
+        x = self.upsample_bn_3(self.upsample_conv_3(x), is_training=self.is_training)
+        x = jax.nn.relu(x)
 
         # tile x16
         N, L, D = x.shape
@@ -60,25 +71,31 @@ class WaveRNN(hk.Module):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.cond_dim = cond_dim
-        self.R = hk.Linear(3 * hidden_dim, with_bias=True,
-                           w_init=hk.initializers.VarianceScaling())
+        self.R = hk.Linear(
+            3 * hidden_dim,
+            with_bias=True,
+            w_init=hk.initializers.VarianceScaling(),
+        )
         self.I_W = hk.get_parameter(
-            'I_W', (cond_dim + 128*3, hidden_dim*3), init=hk.initializers.VarianceScaling())
-        self.I_b = hk.get_parameter('I_b', (1, 3*hidden_dim), init=jnp.zeros)
+            "I_W",
+            (cond_dim + 128 * 3, hidden_dim * 3),
+            init=hk.initializers.VarianceScaling(),
+        )
+        self.I_b = hk.get_parameter("I_b", (1, 3 * hidden_dim), init=jnp.zeros)
         assert hidden_dim % 2 == 0, "Need an even hidden dim"
         d = hidden_dim // 4
         mask = jnp.ones_like(self.I_W)
         embed_dim = hidden_dim // 8
-        mask = mask.at[-embed_dim:, 0*d:3*d].set(0.0)
-        mask = mask.at[-embed_dim:, 4*d:7*d].set(0.0)
-        mask = mask.at[-embed_dim:, 8*d:11*d].set(0.0)
+        mask = mask.at[-embed_dim:, 0 * d : 3 * d].set(0.0)
+        mask = mask.at[-embed_dim:, 4 * d : 7 * d].set(0.0)
+        mask = mask.at[-embed_dim:, 8 * d : 11 * d].set(0.0)
         self.I_W_mask = mask
-        self.O1 = hk.Linear(hidden_dim//4*3)
-        self.O2 = hk.Linear(2**FLAGS.num_coarse_bits)
-        self.O3 = hk.Linear(hidden_dim//4)
-        self.O4 = hk.Linear(2**FLAGS.num_fine_bits)
-        self.c_embed = hk.Embed(2**FLAGS.num_coarse_bits, embed_dim)
-        self.f_embed = hk.Embed(2**FLAGS.num_fine_bits, embed_dim)
+        self.O1 = hk.Linear(hidden_dim // 4 * 3)
+        self.O2 = hk.Linear(2 ** FLAGS.num_coarse_bits)
+        self.O3 = hk.Linear(hidden_dim // 4)
+        self.O4 = hk.Linear(2 ** FLAGS.num_fine_bits)
+        self.c_embed = hk.Embed(2 ** FLAGS.num_coarse_bits, embed_dim)
+        self.f_embed = hk.Embed(2 ** FLAGS.num_fine_bits, embed_dim)
 
     def initial_state(self, batch_size: int):
         return jnp.zeros((batch_size, self.hidden_dim))
@@ -98,15 +115,15 @@ class WaveRNN(hk.Module):
         ut = jax.nn.sigmoid(ut_1 + ut_2)
         rt = jax.nn.sigmoid(rt_1 + rt_2)
         et = jnp.tanh(rt * et_1 + et_2)
-        ht = ut * hx + (1. - ut) * et
-        yc, yf = jnp.split(ht, [self.hidden_dim//4*3], axis=-1)
+        ht = ut * hx + (1.0 - ut) * et
+        yc, yf = jnp.split(ht, [self.hidden_dim // 4 * 3], axis=-1)
         return (yc, yf), ht
 
     def inference(self, mels):
         N, L, D = mels.shape
 
-        c0 = jnp.array([(2**FLAGS.num_coarse_bits) // 2]).astype(jnp.int32)
-        f0 = jnp.array([(2**FLAGS.num_fine_bits)//2]).astype(jnp.int32)
+        c0 = jnp.array([(2 ** FLAGS.num_coarse_bits) // 2]).astype(jnp.int32)
+        f0 = jnp.array([(2 ** FLAGS.num_fine_bits) // 2]).astype(jnp.int32)
 
         def loop(inputs, prev_state):
             mel, rng1, rng2 = inputs
@@ -129,12 +146,12 @@ class WaveRNN(hk.Module):
 
         h0 = self.initial_state(N)
         (ct, ft), _ = hk.dynamic_unroll(
-            loop, (mels, rng1s, rng2s), (c0, f0, h0), time_major=False)
-        return ct*(2**FLAGS.num_fine_bits) + ft - 2**15
+            loop, (mels, rng1s, rng2s), (c0, f0, h0), time_major=False
+        )
+        return ct * (2 ** FLAGS.num_fine_bits) + ft - 2 ** 15
 
     def __call__(self, x, mel):
-        coarse, fine, coarse_t = jax.tree_map(
-            jnp.squeeze, jnp.split(x, 3, axis=-1))
+        coarse, fine, coarse_t = jax.tree_map(jnp.squeeze, jnp.split(x, 3, axis=-1))
         cx = self.c_embed(coarse)
         fx = self.f_embed(fine)
         cx_ = self.c_embed(coarse_t)
@@ -154,9 +171,10 @@ class WaveRNN(hk.Module):
 class Vocoder(hk.Module):
     def __init__(self, is_training=True):
         super().__init__()
-        self.rnn = WaveRNN(FLAGS.rnn_dim, FLAGS.rnn_dim//2)
+        self.rnn = WaveRNN(FLAGS.rnn_dim, FLAGS.rnn_dim // 2)
         self.upsample = UpsampleNetwork(
-            num_output_channels=FLAGS.rnn_dim//2, is_training=is_training)
+            num_output_channels=FLAGS.rnn_dim // 2, is_training=is_training
+        )
         self.is_training = is_training
 
     def inference(self, mel):
