@@ -18,3 +18,4 @@ class FLAGS:
     pad = 1024
     num_coarse_bits = 8  #
     num_fine_bits = 8    # must sum to 16
+    min_mel = 1e-5 # minimum mel value

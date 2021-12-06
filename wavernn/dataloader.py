@@ -23,8 +23,8 @@ def wav2mel(y):
         fmax=FLAGS.fmax,
         power=1
     )
-    mel = np.log(mel + 1e-5)
-    return mel
+    logmel = np.log(mel + FLAGS.min_mel)
+    return logmel
 
 
 def load_data_on_memory(wav_dir: Path):
