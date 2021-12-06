@@ -30,7 +30,7 @@ def wav2mel(y):
 def load_data_on_memory(wav_dir: Path):
     # load all data files on memory
     dataset = []
-    for fp in tqdm(sorted(wav_dir.glob("*.wav"))):
+    for fp in tqdm(sorted(wav_dir.glob("*.wav")), desc="load data to memory", ncols=0):
         y, sr = sf.read(fp, dtype="int16")
         assert sr == FLAGS.sample_rate, "wrong sample rate"
         mel = wav2mel(y.astype(np.float32) / 2 ** 15)
