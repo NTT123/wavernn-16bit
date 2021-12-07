@@ -44,7 +44,7 @@ def create_data_iter(dataset, seq_len, batch_size):
     while True:
         random.shuffle(dataset)
         for mel, y in dataset:
-            R = random.randint(seq_len, mel.shape[1] - 1)
+            R = random.randint(seq_len, mel.shape[1])
             L = R - seq_len
             m1 = mel[:, L:R]
             y1 = y[(L * FLAGS.hop_length) : (R * FLAGS.hop_length)]
