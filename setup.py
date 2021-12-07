@@ -1,6 +1,6 @@
 from setuptools import setup
 
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 url = "https://github.com/ntt123/wavernn-16bit"
 
 install_requires = [
