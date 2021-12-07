@@ -17,7 +17,7 @@ def wav2mel(y):
         hop_length=FLAGS.hop_length,
         win_length=FLAGS.win_length,
         window="hann",
-        center=True,
+        center=False,
         n_mels=FLAGS.n_mels,
         fmin=FLAGS.fmin,
         fmax=FLAGS.fmax,
