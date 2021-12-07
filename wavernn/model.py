@@ -8,45 +8,35 @@ from wavernn.config import FLAGS
 class UpsampleNetwork(hk.Module):
     def __init__(self, num_output_channels, is_training=True):
         super().__init__()
-        self.input_conv = hk.Conv1D(512, 3, padding="VALID", with_bias=False)
-        self.input_bn = hk.BatchNorm(True, True, 0.99)
-        self.conv_1 = hk.Conv1D(512, 3, 1, padding="VALID", with_bias=False)
-        self.bn_1 = hk.BatchNorm(True, True, 0.99)
-        self.conv_2 = hk.Conv1D(512, 5, 1, padding="VALID", with_bias=False)
-        self.bn_2 = hk.BatchNorm(True, True, 0.99)
+        self.input_conv = hk.Conv1D(512, 3, padding="VALID", with_bias=True)
+        self.conv_1 = hk.Conv1D(512, 3, padding="VALID", with_bias=True)
+        self.conv_2 = hk.Conv1D(512, 5, padding="VALID", with_bias=True)
 
         self.upsample_conv_1 = hk.Conv1DTranspose(
-            512, kernel_shape=1, stride=2, padding="SAME", with_bias=False
+            512, kernel_shape=2, stride=2, padding="SAME", with_bias=True
         )
-        self.upsample_bn_1 = hk.BatchNorm(True, True, 0.99)
         self.upsample_conv_2 = hk.Conv1DTranspose(
-            512, kernel_shape=1, stride=2, padding="SAME", with_bias=False
+            512, kernel_shape=2, stride=2, padding="SAME", with_bias=True
         )
-        self.upsample_bn_2 = hk.BatchNorm(True, True, 0.99)
         self.upsample_conv_3 = hk.Conv1DTranspose(
             num_output_channels,
-            kernel_shape=1,
+            kernel_shape=4,
             stride=4,
             padding="SAME",
-            with_bias=False,
+            with_bias=True,
         )
-        self.upsample_bn_3 = hk.BatchNorm(True, True, 0.99)
         self.is_training = is_training
 
     def __call__(self, mel):
-        x = self.input_bn(self.input_conv(mel), is_training=self.is_training)
-        x = jax.nn.relu(x)
-        res_1 = jax.nn.relu(self.bn_1(self.conv_1(x), is_training=self.is_training))
+        x = jax.nn.relu(self.input_conv(mel))
+        res_1 = jax.nn.relu(self.conv_1(x))
         x = x[:, 1:-1] + res_1
-        res_2 = jax.nn.relu(self.bn_2(self.conv_2(x), is_training=self.is_training))
+        res_2 = jax.nn.relu(self.conv_2(x))
         x = x[:, 2:-2] + res_2
 
-        x = self.upsample_bn_1(self.upsample_conv_1(x), is_training=self.is_training)
-        x = jax.nn.relu(x)
-        x = self.upsample_bn_2(self.upsample_conv_2(x), is_training=self.is_training)
-        x = jax.nn.relu(x)
-        x = self.upsample_bn_3(self.upsample_conv_3(x), is_training=self.is_training)
-        x = jax.nn.relu(x)
+        x = jax.nn.relu(self.upsample_conv_1(x))
+        x = jax.nn.relu(self.upsample_conv_2(x))
+        x = jax.nn.relu(self.upsample_conv_3(x))
 
         # tile x16
         N, L, D = x.shape
